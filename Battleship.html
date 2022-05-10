@@ -13,6 +13,7 @@ A simple battleship game. A table is created for both the human and ai players.
 The ai will guess at random until it gets a hit, then it will guess the 4 spots around that point and will repeat if it gets a hit. Else it will go back to random guesses.
 
 Known bugs: will occasionally cause Chrome to stop responding on guess submission. I've done a little testing & this seems to be random.
+NEED TO UPDATE: The infinite loop is coming from line 234, where you are missing an additional check for eGuessCase to break the while loop if you've gone through all 4 edges.
 Future improvements: make ai guess in checkerboard pattern & guess opposite end of hits so it doesn't hit half of ship & move on. 
                      Add random button for human ship placement
                      add visible stats for shots fired and ships sunk

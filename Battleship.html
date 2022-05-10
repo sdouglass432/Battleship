@@ -1,0 +1,298 @@
+<!DOCTYPE HTML>
+<HTML>
+<HEAD>
+<TITLE>HTML Template</TITLE>
+<META charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<META name = "Author" content="Samuel Douglass" />
+<META name="Date" content="May 5, 2022" />
+<META name="Description" content="simple Battleship game" />
+<SCRIPT type="text/javascript">
+/* 
+A simple battleship game. A table is created for both the human and ai players. 
+The ai will guess at random until it gets a hit, then it will guess the 4 spots around that point and will repeat if it gets a hit. Else it will go back to random guesses.
+
+Known bugs: will occasionally cause Chrome to stop responding on guess submission. I've done a little testing & this seems to be random.
+Future improvements: make ai guess in checkerboard pattern & guess opposite end of hits so it doesn't hit half of ship & move on. 
+                     Add random button for human ship placement
+                     add visible stats for shots fired and ships sunk
+                     make submission less annoying. maybe clickable board
+*/
+var gameStart = false//changes to true once all ships are placed
+var hKillCt = 0//once either kill count == 5, the game is over
+var eKillCt = 0
+var type = 0//changes if built board is for the human or ai
+var hBoard = []
+var eBoard = []
+var pHorizontal = 0//if player is placing vertically or horizontally
+var pShipCount = 0//how many player ships have been placed
+//arrays for Player & enemy ships. [id, length, hits] 
+var pShips =[
+    ['Carrier',5,0],
+    ['Battleship',4,0],
+    ['Destroyer',3,0],
+    ['Submarine',3,0],
+    ['Patrol Boat',2,0]
+]
+var eShips =[
+    ['Carrier',5,0],
+    ['Battleship',4,0],
+    ['Destroyer',3,0],
+    ['Submarine',3,0],
+    ['Patrol Boat',2,0]
+]
+var ePrevC = null//if ai guesses a hit, these vars will be the col & row that was guessed
+var ePrevR = null
+var eGuessCase = 0//goes up by 1 every time the ai guesses around a hit
+
+function makeGrid(){//makes both boards
+    var html='';
+    for (var r=0; r<11; r++) {
+        var boardRow = []
+        if (r==0){
+            html +="<tr id=\"headr\">";
+        } else {
+            html += "<tr id=\"Row"+(r-1)+"\">"
+        }
+        for (var c=0; c<11; c++){
+            if (r==0 && c==0){
+                html += "<td></td>";
+            } else if (r==0){
+                html += "<th>"+(c)+"</th>";
+            } else if (c==0) {
+                html += "<th>"+String.fromCharCode(64 + r)+"</th>";
+            } else {
+                html += "<td height=30 width=30 style=\"background: #0099ff\" id="+type+"Cell"+(r-1)+"-"+(c-1)+"></td>";
+                boardRow.push([null,0])//adds cell data with 2 properties to boardrow. first is used for ship id. second is used to check if space has been guessed already.
+            }
+        }
+        if (r != 0 && c != 0) {
+            if (type==0){
+			    eBoard.push(boardRow);
+            } else {
+                hBoard.push(boardRow);
+            }
+        } 
+    }
+    if (type==0){
+        document.getElementById("eGrid").innerHTML = html;
+        type++
+        makeGrid()
+    } else {
+        document.getElementById("pGrid").innerHTML = html;
+        ePlace()
+    }
+}
+
+function ePlace() {//enemy place phase
+    for (s=0; s<eShips.length;){
+        var ship = eShips[s]
+        var id = ship[0]
+        var size = ship[1]
+        var firstR=0
+        var firstC=0
+        var clearCount=0
+        //if 0, ship is vertical, if 1, ship is horizontal
+        var horizontal = Math.round(Math.random());
+        if (horizontal == 0){
+            firstR = Math.floor(Math.random() * (10 - size));
+			firstC = Math.floor(Math.random() * 10);
+			for (let i=0; i<size; i++) {
+                if (eBoard[firstR+i][firstC][0] == null) {
+                    clearCount++;
+                }
+            }
+        } else {
+            firstR = Math.floor(Math.random() * 10);
+			firstC = Math.floor(Math.random() * (10 - size));
+            for (let i=0; i<size; i++) {
+                if (eBoard[firstR][firstC+i][0] == null) {
+                    clearCount++;
+                }
+            }
+        }
+        if (clearCount == size) {
+            for (var i=0; i<size; i++){
+                if (horizontal == 0){
+                    eBoard[firstR+i][firstC].shift();
+                    eBoard[firstR+i][firstC].unshift(id)
+                } else {
+                    eBoard[firstR][firstC+i].shift();
+                    eBoard[firstR][firstC+i].unshift(id);
+                }
+            }
+            s++
+        }
+    }
+    console.log(eBoard)
+    document.getElementById("results").innerHTML = "Place your Carrier! Size: 5 spaces"
+}
+function pOrientation(orient){//takes input from buttons to change player ship orientation
+    pHorizontal = orient
+}
+function onSubmit(){//processes input & uses proper function for placing or firing phase.
+     input = document.getElementById("text").value;
+     split = input.toUpperCase().split(" ");
+     gRow = Number((split[0].charCodeAt())) - 65;
+     gCol= Number(split[1]) - 1;
+    if (gameStart == false){
+        hPlace()
+    } else {
+        hGuess()
+    }
+}
+function hPlace(){//human place phase
+    var ship = pShips[pShipCount]
+    var id = ship[0]
+    var size = ship[1]
+    var clearCount=0//checks for clear spaces where ship will be placed
+    if (pHorizontal == 0){
+        if (gRow + size < 11){
+			for (let i=0; i<size; i++) {
+                if (hBoard[gRow+i][gCol][0] == null) {
+                    clearCount++;
+                }
+            }
+        }
+    } else {
+        if (gCol + size < 11){
+            for (let i=0; i<size; i++) {
+                if (hBoard[gRow][gCol+i][0] == null) {
+                    clearCount++;
+                }
+            }
+        }
+    }
+    //places ship
+    if (clearCount == size) {
+        for (var i=0; i<size; i++){
+            if (pHorizontal == 0){
+                document.getElementById("1Cell"+(Number(gRow)+i)+"-"+gCol).style.background = "#808080";
+                hBoard[gRow+i][gCol].shift();
+                hBoard[gRow+i][gCol].unshift(id)
+            } else {
+                document.getElementById("1Cell"+gRow+"-"+(Number(gCol)+i)).style.background = "#808080";
+                hBoard[gRow][gCol+i].shift();
+                hBoard[gRow][gCol+i].unshift(id);
+            }
+        }
+        pShipCount++
+    } else {
+        alert("your "+id+" is either over the edge of the board, or overlapping another ship.")
+    }
+    if (pShipCount==5){
+        gameStart = true
+        alert("You have placed all ships")
+        document.getElementById("results").innerHTML = "You have placed all your ships. Time to start guessing!"
+        console.log(hBoard)
+    } else {
+        document.getElementById("results").innerHTML = "Place your "+pShips[pShipCount][0]+"! Size: "+pShips[pShipCount][1]+" spaces"
+    }
+}
+function hGuess(){//human guess phase
+    var gSpace = eBoard[gRow][gCol]
+    var ship = gSpace[0]
+    var shot = gSpace[1]
+    if (shot == 0){
+        if (ship == null){
+            document.getElementById("0Cell"+gRow+"-"+gCol).style.background = "#0000ff";
+            document.getElementById("results").innerHTML = "Miss!"
+        } else {
+            document.getElementById("0Cell"+gRow+"-"+gCol).style.background = "#d82c20";
+            document.getElementById("results").innerHTML = "Hit!"
+            for (var i in eShips){
+                if (eShips[i][0] == ship){
+                    if (eShips[i][2] < eShips[i][1]){
+                        eShips[i][2] += 1
+                    }
+                    if (eShips[i][2] == eShips [i][1]){
+                        document.getElementById("results").innerHTML = "You sunk their "+ship+"!"
+                        hKillCt += 1
+                    }
+                }
+            }
+        }
+        eBoard[gRow][gCol][1] = 1
+        eGuess()
+    } else {
+        alert("You've already guessed this spot!")
+    }
+    if (hKillCt == 5){
+        alert("You sunk all of their ships! Refresh to play again!")
+    }
+}
+function eGuess(){//ai guess phase
+    var aRow = Math.floor(Math.random() * 10);
+	var aCol = Math.floor(Math.random() * 10);
+    if (ePrevC != null && ePrevR != null){//loop for guessing around a hit
+        switch(eGuessCase){
+            case 0: aRow=ePrevR+1; aCol=ePrevC; eGuessCase++; break;
+            case 1: aRow=ePrevR-1; aCol=ePrevC; eGuessCase++; break;
+            case 2: aRow=ePrevR; aCol=ePrevC+1; eGuessCase++; break;
+            case 3: aRow=ePrevR; aCol=ePrevC-1; eGuessCase++; break;
+        }
+        while (hBoard[aRow][aCol][1] != 0){
+            switch(eGuessCase++){
+                case 0: aRow=ePrevR+1; aCol=ePrevC; break;
+                case 1: aRow=ePrevR-1; aCol=ePrevC; break;
+                case 2: aRow=ePrevR; aCol=ePrevC+1; break;
+                case 3: aRow=ePrevR; aCol=ePrevC-1; break;
+            }
+        }
+        if (eGuessCase == 4){
+            ePrevC = null
+            ePrevR = null
+            eGuessCase == 0
+        }
+    }
+    while (hBoard[aRow][aCol][1] != 0) {
+		aRow = Math.floor(Math.random() * 10);
+		aCol = Math.floor(Math.random() * 10);
+	}
+    if (hBoard[aRow][aCol][1] == 0){
+        if (hBoard[aRow][aCol][0] == null){
+            document.getElementById("1Cell"+aRow+"-"+aCol).style.background = "#0000ff";
+            document.getElementById("eresults").innerHTML = "The computer missed!"
+        } else {
+            document.getElementById("1Cell"+aRow+"-"+aCol).style.background = "#d82c20";
+            document.getElementById("eresults").innerHTML = "The computer hit your "+hBoard[aRow][aCol][0]+"!"
+            ePrevC = aCol
+            ePrevR = aRow
+            eGuessCase = 0
+            for (var i in pShips){
+                if (pShips[i][0] == hBoard[aRow][aCol][0]){
+                    if (pShips[i][2] < pShips[i][1]){
+                        pShips[i][2] += 1
+                    }
+                    if (pShips[i][2] == pShips [i][1]){
+                        document.getElementById("eresults").innerHTML = "The computer sunk your "+hBoard[aRow][aCol][0]+"!"
+                        eKillCt += 1
+                    }
+                }
+            }
+        }
+        hBoard[aRow][aCol][1] = 1
+    } 
+    if (eKillCt == 5){
+        alert("All of your ships have been sunk. Refresh & try again")
+    }
+}
+</SCRIPT>
+</HEAD>
+<BODY onload="makeGrid()">
+<h1>How to play Battleship</h1><br />
+<p >
+    To play, first place your ships by inputting the top (if placing vertically) or left (if placing horzontally) coordinate for each ship. <br />
+    Once all ships are placed, guess spaces on your opponent's board & try to hit all of their ships before they hit yours!<br/>
+    <br />
+    NOTE: when you input coordinates, be sure to put a space between the letter and number. for example: A 1 instead of A1
+<TABLE id="eGrid"></TABLE> <BR />
+<DIV id="eresults"></DIV>
+<TABLE id="pGrid"></TABLE> <br />
+<DIV id="results"></DIV>
+<INPUT type="text" id="text"/>
+<BUTTON id="submit" onClick="onSubmit();">Submit</BUTTON> <BR />
+<BUTTON id="vertical" onClick="pOrientation(0)">Vertical</BUTTON>
+<BUTTON id="horizontal" onClick="pOrientation(1)">Horizontal</BUTTON>
+</BODY>
+</HTML>
